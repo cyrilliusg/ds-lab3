@@ -18,12 +18,12 @@ class CarsView(APIView):
             # Car Service критичен
             return Response(
                 {"message": "Car Service is unavailable"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
         except Exception:
             return Response(
                 {"message": "Failed to load cars"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
 
         return Response(cars)
@@ -38,12 +38,12 @@ class RentalListView(APIView):
         except ServiceUnavailable:
             return Response(
                 {"message": "Rental Service is unavailable"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
         except Exception:
             return Response(
                 {"message": "Failed to load rentals"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
 
         enriched = []
@@ -89,7 +89,7 @@ class RentalListView(APIView):
         except Exception:
             return Response(
                 {"message": "Car Service is unavailable or car not found"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
 
         price_per_day = car["price"]
@@ -105,7 +105,7 @@ class RentalListView(APIView):
         except Exception:
             return Response(
                 {"message": "Failed to reserve car"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
 
         # 3. Создаём оплату
@@ -130,7 +130,7 @@ class RentalListView(APIView):
 
             return Response(
                 {"message": "Failed to create rental and payment"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
 
         # если всё прошло успешно:
@@ -155,12 +155,12 @@ class RentalDetailView(APIView):
         except ServiceUnavailable:
             return Response(
                 {"message": "Rental Service is unavailable"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
         except Exception:
             return Response(
                 {"message": "Failed to load rental"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
 
         car = clients.get_car(r["carUid"], allow_fallback=True)
@@ -200,7 +200,7 @@ class RentalDetailView(APIView):
         except Exception:
             return Response(
                 {"message": "Failed to load rental"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
 
         # 2. Снимаем резерв с автомобиля
@@ -209,7 +209,7 @@ class RentalDetailView(APIView):
         except Exception:
             return Response(
                 {"message": "Failed to release car"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
 
         # 3. Cancel rental – если не получилось, ставим в очередь
@@ -243,7 +243,7 @@ class RentalFinishView(APIView):
         except Exception:
             return Response(
                 {"message": "Failed to load rental"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
 
         try:
@@ -252,7 +252,7 @@ class RentalFinishView(APIView):
         except Exception:
             return Response(
                 {"message": "Failed to finish rental"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
 
         return Response(status=status.HTTP_204_NO_CONTENT)
