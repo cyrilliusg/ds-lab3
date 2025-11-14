@@ -109,8 +109,20 @@ class RentalListView(APIView):
             )
 
         # 3. Создаём оплату
-        payment = clients.create_payment(total_price)
-        payment_uid = payment['paymentUid']
+        try:
+            payment = clients.create_payment(total_price)
+            payment_uid = payment['paymentUid']
+        except Exception:
+            try:
+                # снимаем резерв авто
+                clients.release_car(car_uid)
+            except Exception:
+                pass
+
+            return Response(
+                {"message": "Payment Service unavailable"},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
 
         try:
             # 4. Создаём запись аренды
@@ -129,7 +141,7 @@ class RentalListView(APIView):
                 pass
 
             return Response(
-                {"message": "Failed to create rental and payment"},
+                {"message": "Failed to create rental"},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
 
