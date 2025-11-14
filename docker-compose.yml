@@ -57,6 +57,7 @@ services:
       postgres:
         condition: service_healthy
         restart: true
+
   rental-service:
     container_name: rental-service
     build:
@@ -93,6 +94,7 @@ services:
       postgres:
         condition: service_healthy
         restart: true
+
   payment-service:
     container_name: payment-service
     build:
@@ -129,6 +131,7 @@ services:
       postgres:
         condition: service_healthy
         restart: true
+
   gateway-service:
     container_name: gateway-service
     build:
@@ -142,6 +145,8 @@ services:
       CAR_SERVICE_URL: "http://car-service:8000/api/v1"
       RENTAL_SERVICE_URL: "http://rental-service:8000/api/v1"
       PAYMENT_SERVICE_URL: "http://payment-service:8000/api/v1"
+      REDIS_URL: "redis://redis:6379/0"
+      ROLE: "web"
     ports:
       - "8080:8000"
     tmpfs: [ "/tmp", "/run" ]
@@ -160,7 +165,38 @@ services:
         condition: service_healthy
         restart: true
 
-# TODO добавить сервисы
+  redis:
+    image: redis:8.2.3-alpine
+    container_name: redis
+    restart: unless-stopped
+    command: [ "redis-server","--appendonly","yes","--appendfsync","everysec" ]
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks: [ internal ]
+
+  gateway_worker:
+    container_name: gateway_worker-service
+    build:
+      context: ./services/gateway-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DJANGO_SECRET_KEY: "test"
+      MODE: "docker"
+      DJANGO_ALLOWED_HOSTS: "*"
+      CAR_SERVICE_URL: "http://car-service:8000/api/v1"
+      RENTAL_SERVICE_URL: "http://rental-service:8000/api/v1"
+      PAYMENT_SERVICE_URL: "http://payment-service:8000/api/v1"
+      REDIS_URL: "redis://redis:6379/0"
+      ROLE: "worker"
+    depends_on:
+      - redis
+      - gateway-service
+    networks: [ internal ]
 
 volumes:
   pgdata:

@@ -91,6 +91,7 @@ jobs:
       CAR_SERVICE_URL: "http://car-service:8000/api/v1"
       RENTAL_SERVICE_URL: "http://rental-service:8000/api/v1"
       PAYMENT_SERVICE_URL: "http://payment-service:8000/api/v1"
+      REDIS_URL: "=redis://redis:6379/0"
 
     steps:
       - uses: actions/checkout@v4

@@ -27,6 +27,7 @@ CAR_SERVICE_URL = os.getenv("CAR_SERVICE_URL", "http://car-service:8000/api/v1")
 RENTAL_SERVICE_URL = os.getenv("RENTAL_SERVICE_URL", "http://rental-service:8000/api/v1")
 PAYMENT_SERVICE_URL = os.getenv("PAYMENT_SERVICE_URL", "http://payment-service:8000/api/v1")
 
+REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379/0")
 
 # Если запускаем локально, то соответствующий хост
 if MODE == 'local':

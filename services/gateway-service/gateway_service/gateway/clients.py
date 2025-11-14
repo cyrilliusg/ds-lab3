@@ -4,6 +4,8 @@ from typing import Any, Optional
 import requests
 from django.conf import settings
 
+from .circuit_breaker import CircuitBreaker, ServiceUnavailable
+
 logger = logging.getLogger(__name__)
 
 
@@ -56,24 +58,45 @@ car_client = ServiceClient(settings.CAR_SERVICE_URL)
 payment_client = ServiceClient(settings.PAYMENT_SERVICE_URL)
 rental_client = ServiceClient(settings.RENTAL_SERVICE_URL)
 
+# Circuit breakers
+car_cb = CircuitBreaker("car_service", failure_threshold=3, recovery_timeout=10)
+payment_cb = CircuitBreaker("payment_service", failure_threshold=3, recovery_timeout=10)
+rental_cb = CircuitBreaker("rental_service", failure_threshold=3, recovery_timeout=10)
+
 
 def _user_headers(username: str) -> dict[str, str]:
     return {"X-User-Name": username}
 
 
-# ==== CAR SERVICE ====
+# ==== CAR SERVICE (READ, with CB) ====
 def get_cars(show_all: bool = False, page: int = 0, size: int = 10):
     params = {"showAll": show_all, "page": page, "size": size}
-    r = car_client.get("/cars", params=params)
-    return r.json()
+
+    def _call():
+        r = car_client.get("/cars", params=params)
+        return r.json()
+
+    # Car Service для /cars – критичен, поэтому фолбэка нет → ошибка поднимется вверх
+    return car_cb.call(_call)
 
 
-def get_car(car_uid: str):
-    r = car_client.get(f"/cars/{car_uid}")
-    return r.json()
+def get_car(car_uid: str, allow_fallback: bool = False):
+    def _call():
+        r = car_client.get(f"/cars/{car_uid}")
+        return r.json()
+
+    def _fallback():
+        if allow_fallback:
+            # Фолбэк: только uid
+            return {"carUid": car_uid}
+        # Критичный сценарий (например, POST /rental)
+        raise ServiceUnavailable("Car service unavailable")
+
+    return car_cb.call(_call, fallback=_fallback if allow_fallback else None)
 
 
 def reserve_car(car_uid: str) -> None:
+    # запись состояния – без circuit breaker
     car_client.post(f"/cars/{car_uid}/reserve/")
 
 
@@ -81,22 +104,30 @@ def release_car(car_uid: str) -> None:
     car_client.post(f"/cars/{car_uid}/release/")
 
 
-# ==== PAYMENT SERVICE ====
+# ==== PAYMENT SERVICE (READ, with CB) ====
 def create_payment(price: float):
     r = payment_client.post("/payment/", json={"price": price})
     return r.json()
 
 
-def cancel_payment(payment_uid: str) -> None:
-    payment_client.delete(f"/payment/{payment_uid}/")
+def cancel_payment(paymentUid: str) -> None:
+    payment_client.delete(f"/payment/{paymentUid}/")
 
 
-def get_payment(payment_uid: str):
-    r = payment_client.get(f"/payment/{payment_uid}")
-    return r.json()
+def get_payment(payment_uid: str, allow_fallback: bool = False):
+    def _call():
+        r = payment_client.get(f"/payment/{payment_uid}")
+        return r.json()
+
+    def _fallback():
+        if allow_fallback:
+            return {"paymentUid": payment_uid}
+        raise ServiceUnavailable("Payment service unavailable")
+
+    return payment_cb.call(_call, fallback=_fallback if allow_fallback else None)
 
 
-# ==== RENTAL SERVICE ====
+# ==== RENTAL SERVICE (READ, with CB) ====
 def create_rental(username: str, car_uid: str, payment_uid: str, date_from: str, date_to: str):
     data = {
         "carUid": car_uid,
@@ -110,14 +141,23 @@ def create_rental(username: str, car_uid: str, payment_uid: str, date_from: str,
 
 def get_rentals(username: str):
     headers = _user_headers(username)
-    r = rental_client.get("/rental", headers=headers)
-    return r.json()
+
+    def _call():
+        r = rental_client.get("/rental", headers=headers)
+        return r.json()
+
+    # Rental Service для списка аренды – критичен → фолбэка нет
+    return rental_cb.call(_call)
 
 
 def get_rental(username: str, rental_uid: str):
     headers = _user_headers(username)
-    r = rental_client.get(f"/rental/{rental_uid}", headers=headers)
-    return r.json()
+
+    def _call():
+        r = rental_client.get(f"/rental/{rental_uid}", headers=headers)
+        return r.json()
+
+    return rental_cb.call(_call)
 
 
 def finish_rental(username: str, rental_uid: str) -> None:
@@ -125,6 +165,6 @@ def finish_rental(username: str, rental_uid: str) -> None:
     rental_client.post(f"/rental/{rental_uid}/finish/", headers=headers)
 
 
-def cancel_rental(username: str, rental_uid: str) -> None:
+def cancel_rental(username: str, rentalUid: str) -> None:
     headers = _user_headers(username)
-    rental_client.delete(f"/rental/{rental_uid}/", headers=headers)
+    rental_client.delete(f"/rental/{rentalUid}/", headers=headers)
