@@ -7,21 +7,102 @@ on:
     branches:
       - master
 jobs:
-  build:
-    name: Autograding
+  tests:
+    name: Autograding & Project Tests
     runs-on: ubuntu-latest
+    env:
+      PYTHONUNBUFFERED: "1"
+      # Пользователи/БД приложения:
+      DB_CARS: "cars"
+      DB_RENTALS: "rentals"
+      DB_PAYMENTS: "payments"
+      DB_USER: "program"
+      DB_PASSWORD: "test"
+      DB_DOCKER_HOST: "postgres"
+      DB_LOCAL_HOST: "localhost"
+      DB_PORT: "5432"
+      # для сервисов
+      DJANGO_SECRET_KEY: "test"
+      MODE: "docker"
+      DJANGO_ALLOWED_HOSTS: "*"
+      CAR_SERVICE_URL: "http://car-service:8000/api/v1"
+      RENTAL_SERVICE_URL: "http://rental-service:8000/api/v1"
+      PAYMENT_SERVICE_URL: "http://payment-service:8000/api/v1"
+
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - uses: docker/setup-buildx-action@v2
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: requirements.txt
 
-      # TODO build and run unit tests
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Car-service system check
+        run: python services/car-service/manage.py check
+      - name: Run tests
+        run: python services/car-service/manage.py test
+
+      - name: Rental-service system check
+        run: python services/rental-service/manage.py check
+      - name: Run tests
+        run: python services/rental-service/manage.py test
+
+      - name: Payment-service system check
+        run: python services/payment-service/manage.py check
+      - name: Run tests
+        run: python services/payment-service/manage.py test
+
+      - name: Gateway-service system check
+        run: python services/gateway-service/manage.py check
+      - name: Run tests
+        run: python services/gateway-service/manage.py test
+
+  build:
+    name: Autograding
+    needs: [tests]
+    runs-on: ubuntu-latest
+    env:
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "postgres"
+      POSTGRES_DB: "postgres"
+      # Пользователи/БД приложения:
+      DB_CARS: "cars"
+      DB_RENTALS: "rentals"
+      DB_PAYMENTS: "payments"
+      DB_USER: "program"
+      DB_PASSWORD: "test"
+      DB_DOCKER_HOST: "postgres"
+      DB_LOCAL_HOST: "localhost"
+      DB_PORT: "5432"
+      # для сервисов
+      DJANGO_SECRET_KEY: "test"
+      MODE: "docker"
+      DJANGO_ALLOWED_HOSTS: "*"
+      CAR_SERVICE_URL: "http://car-service:8000/api/v1"
+      RENTAL_SERVICE_URL: "http://rental-service:8000/api/v1"
+      PAYMENT_SERVICE_URL: "http://payment-service:8000/api/v1"
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Build images
         timeout-minutes: 10
-        run: docker compose build
+        run: docker compose build --parallel
 
       - name: Run containers
         timeout-minutes: 5
@@ -31,29 +112,17 @@ jobs:
         env:
           WAIT_PORTS: 8080,8070,8060,8050
 
-      # TODO setup variant, service and port
-
       - name: Run API Tests
         timeout-minutes: 5
         run: ./scripts/test-script.sh
         env:
-          VARIANT: <variant>
-          SERVICE_NAME: <your service name>
-          PORT_NUMBER: <port number>
+          VARIANT: "v3"
+          SERVICE_NAME: "gateway-service"
+          PORT_NUMBER: "8080"
 
       - uses: education/autograding@v1
         id: autograder
         continue-on-error: true
-
-      - name: Github auto grader mark
-        uses: Romanow/google-sheet-autograder-marker@v1.0
-        with:
-          google_token: ${{secrets.GOOGLE_API_KEY}}
-          sheet_id: "1xkgjUX6Qmk7rdJG-QPOToav-HWWtthJjnShIKnw3oIY"
-          homework_number: 3
-          user_column: 'D'
-          column_offset: 'F'
-          mark: "'+"
 
       - name: Stop containers
         if: always()
