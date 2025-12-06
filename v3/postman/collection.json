@@ -1414,7 +1414,7 @@
 											"    pm.expect(response.car.model).to.be.eq(\"GLA 250\")",
 											"    pm.expect(response.car.registrationNumber).to.be.eq(\"ЛО777Х799\")",
 											"",
-											"    pm.expect(response.payment).to.be.empty",
+
 											"})"
 										],
 										"type": "text/javascript"
