@@ -176,7 +176,7 @@ class RentalDetailView(APIView):
             )
 
         car = clients.get_car(r["carUid"], allow_fallback=True)
-        payment = clients.get_payment(r["paymentUid"], allow_fallback=False)
+        payment = clients.get_payment(r["paymentUid"], allow_fallback=True)
 
         car_block = {"carUid": car["carUid"]}
         if "brand" in car:
